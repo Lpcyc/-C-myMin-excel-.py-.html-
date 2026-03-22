@@ -1,62 +1,62 @@
-# C++ Bug Tracking Log
+# C++ Bug 追踪记录
 
-A running record of bugs encountered and resolved during C++ development, along with root‑cause analysis and fix notes.
+记录 C++ 开发过程中遇到并解决的 Bug，包含根本原因分析与修复说明。
 
 ---
 
-## Bug Record Template
+## Bug 记录模板
 
-Use the following template when logging a new bug.
+新增 Bug 时请使用以下模板填写。
 
 ```
-### BUG-XXX: <Short Title>
+### BUG-XXX: <简短标题>
 
-| Field        | Detail |
-|--------------|--------|
-| Date         | YYYY-MM-DD |
-| Severity     | Critical / High / Medium / Low |
-| Status       | Open / In Progress / Resolved |
-| Component    | <module or file name> |
-| Reporter     | <name or handle> |
+| 字段     | 内容 |
+|----------|------|
+| 日期     | YYYY-MM-DD |
+| 严重程度 | 严重 / 高 / 中 / 低 |
+| 状态     | 待处理 / 处理中 / 已解决 |
+| 模块     | <模块或文件名> |
+| 报告人   | <姓名或账号> |
 
-**Description**
-A concise description of the unexpected behaviour.
+**问题描述**
+简明描述出现的异常行为。
 
-**Minimal Reproducer**
+**最小复现代码**
 ```cpp
-// smallest code snippet that triggers the bug
+// 触发 Bug 的最小代码片段
 ```
 
-**Root Cause**
-Explanation of why the bug occurs.
+**根本原因**
+说明 Bug 产生的原因。
 
-**Fix**
-What was changed to resolve the issue.
+**修复方案**
+描述为解决问题所做的修改。
 
-**Lessons Learned**
-Key takeaway to prevent similar bugs in the future.
+**经验教训**
+避免同类 Bug 的关键要点。
 ```
 
 ---
 
-## Bug Records
+## Bug 记录
 
 ---
 
-### BUG-001: Map Default Value Trap
+### BUG-001: map 默认值陷阱
 
-| Field        | Detail |
-|--------------|--------|
-| Date         | 2026-03-20 |
-| Severity     | Medium |
-| Status       | Resolved |
-| Component    | Frequency counting / lookup logic |
-| Reporter     | Lpcyc |
+| 字段     | 内容 |
+|----------|------|
+| 日期     | 2026-03-20 |
+| 严重程度 | 中 |
+| 状态     | 已解决 |
+| 模块     | 频率统计 / 查找逻辑 |
+| 报告人   | Lpcyc |
 
-**Description**
-When checking whether a key exists in a `std::map`, using the subscript operator `[]` to query the value silently inserts a default‑constructed entry (0 for integers) into the map if the key is absent. This inflates the map's size and causes incorrect "key exists" assumptions later in the code.
+**问题描述**
+在使用 `std::map` 检查某个键是否存在时，若通过下标运算符 `[]` 查询一个不存在的键，map 会悄无声息地将该键以默认值（整型为 0）插入容器。这会导致 map 的大小被错误地撑大，并在后续代码中产生"键已存在"的错误判断。
 
-**Minimal Reproducer**
+**最小复现代码**
 ```cpp
 #include <iostream>
 #include <map>
@@ -66,74 +66,74 @@ int main() {
     freq[1] = 3;
     freq[2] = 5;
 
-    // BUG: querying a missing key with [] inserts it with value 0
+    // BUG：用 [] 查询不存在的键，会将该键以值 0 插入 map
     if (freq[3] == 0) {
-        std::cout << "Key 3 not found\n"; // prints, but key 3 is now IN the map!
+        std::cout << "键 3 不存在\n"; // 会打印，但键 3 已经被插入 map 了！
     }
 
-    std::cout << "Map size: " << freq.size() << "\n"; // prints 3, expected 2
+    std::cout << "Map 大小：" << freq.size() << "\n"; // 打印 3，预期为 2
     return 0;
 }
 ```
 
-**Root Cause**
-`std::map::operator[]` is specified to perform an *insert‑or‑assign* operation: if the key does not exist it default‑constructs a value and inserts the new pair before returning a reference to it. Any read through `[]` therefore mutates the container.
+**根本原因**
+`std::map::operator[]` 的规范行为是"插入或赋值"：若键不存在，会先默认构造一个值并将键值对插入容器，再返回该值的引用。因此任何通过 `[]` 进行的读操作都会改变容器状态。
 
-**Fix**
-Use `std::map::count()` or `std::map::find()` to query existence without side effects.
+**修复方案**
+使用 `std::map::count()` 或 `std::map::find()` 进行无副作用的存在性查询。
 
 ```cpp
-// Option A – count (returns 0 or 1 for std::map)
+// 方案 A —— count（对 std::map 返回 0 或 1）
 if (freq.count(3) == 0) {
-    std::cout << "Key 3 not found\n"; // map size stays 2
+    std::cout << "键 3 不存在\n"; // map 大小保持为 2
 }
 
-// Option B – find
+// 方案 B —— find
 auto it = freq.find(3);
 if (it == freq.end()) {
-    std::cout << "Key 3 not found\n";
+    std::cout << "键 3 不存在\n";
 } else {
-    std::cout << "Value: " << it->second << "\n";
+    std::cout << "值：" << it->second << "\n";
 }
 
-// Option C – C++20 contains()
+// 方案 C —— C++20 contains()
 if (!freq.contains(3)) {
-    std::cout << "Key 3 not found\n";
+    std::cout << "键 3 不存在\n";
 }
 ```
 
-**Lessons Learned**
-- Never use `map[key]` purely for a read/existence check; it has an insertion side‑effect.
-- Prefer `find()` when you need both existence check and value access in one step.
-- Enable address‑sanitizer or add size‑assertion unit tests to catch unexpected container growth early.
+**经验教训**
+- 不要用 `map[key]` 做纯粹的读取或存在性检查，它有插入副作用。
+- 需要同时检查存在性并获取值时，优先使用 `find()`。
+- 开启 AddressSanitizer 或在单元测试中加入容器大小断言，以便及早发现容器被意外撑大的问题。
 
 ---
 
-### BUG-002: Big Number Simulation Edge Cases
+### BUG-002: 大数模拟边界情况
 
-| Field        | Detail |
-|--------------|--------|
-| Date         | 2026-03-21 |
-| Severity     | High |
-| Status       | Resolved |
-| Component    | Big integer arithmetic (array / string simulation) |
-| Reporter     | Lpcyc |
+| 字段     | 内容 |
+|----------|------|
+| 日期     | 2026-03-21 |
+| 严重程度 | 高 |
+| 状态     | 已解决 |
+| 模块     | 大整数运算（数组 / 字符串模拟） |
+| 报告人   | Lpcyc |
 
-**Description**
-A hand‑rolled big‑integer implementation (storing digits in a `std::vector<int>` or `std::string`) produced wrong results or crashed on several edge cases:
+**问题描述**
+手写的大整数实现（用 `std::vector<int>` 或 `std::string` 存储各位数字）在以下几个边界情况下产生了错误结果或崩溃：
 
-1. Adding two numbers where one operand is `"0"` returned `"00"` instead of `"0"`.
-2. Multiplying any number by `"0"` returned the full‑length zero‑padded string instead of `"0"`.
-3. Subtraction of equal numbers returned `""` (empty string) instead of `"0"`.
-4. Leading zeros were not stripped after carry propagation.
+1. 两数相加，其中一个操作数为 `"0"` 时，返回 `"00"` 而非 `"0"`。
+2. 任意数乘以 `"0"` 时，返回全为零的长字符串而非 `"0"`。
+3. 两个相等的数相减，返回 `""` （空字符串）而非 `"0"`。
+4. 进位运算结束后，前导零未被去除。
 
-**Minimal Reproducer**
+**最小复现代码**
 ```cpp
 #include <iostream>
 #include <string>
 #include <algorithm>
 
-// Simplified big-number addition (buggy version)
+// 简化版大数加法（有 Bug 的版本）
 std::string addBig(const std::string& a, const std::string& b) {
     std::string result;
     int carry = 0, i = a.size() - 1, j = b.size() - 1;
@@ -145,31 +145,31 @@ std::string addBig(const std::string& a, const std::string& b) {
         result += char('0' + sum % 10);
     }
     std::reverse(result.begin(), result.end());
-    return result; // BUG: returns "0" + "0" = "00", not "0"
+    return result; // BUG："0" + "0" 返回 "00"，而非 "0"
 }
 
 int main() {
-    std::cout << addBig("0", "0") << "\n"; // prints "00", expected "0"
+    std::cout << addBig("0", "0") << "\n"; // 打印 "00"，预期为 "0"
     return 0;
 }
 ```
 
-**Root Cause**
+**根本原因**
 
-| # | Edge Case | Root Cause |
-|---|-----------|------------|
-| 1 | `"0" + "0"` → `"00"` | No leading‑zero strip after construction |
-| 2 | `n × "0"` → `"000…0"` | Early‑exit check for zero operand missing |
-| 3 | `n − n` → `""` | Loop exits without pushing a `'0'` when result is empty |
-| 4 | General leading zeros | `stripLeadingZeros` helper not called before returning |
+| 序号 | 边界情况 | 根本原因 |
+|------|----------|----------|
+| 1 | `"0" + "0"` → `"00"` | 构造完成后未去除前导零 |
+| 2 | `n × "0"` → `"000…0"` | 缺少对零操作数的提前退出判断 |
+| 3 | `n − n` → `""` | 循环结束时，结果为空时未补充 `'0'` |
+| 4 | 一般性前导零问题 | 返回前未调用 `stripLeadingZeros` 辅助函数 |
 
-**Fix**
+**修复方案**
 ```cpp
 #include <iostream>
 #include <string>
 #include <algorithm>
 
-// Strip leading zeros; always keep at least one digit
+// 去除前导零；至少保留一位数字
 std::string stripLeadingZeros(const std::string& s) {
     size_t start = s.find_first_not_of('0');
     return (start == std::string::npos) ? "0" : s.substr(start);
@@ -185,33 +185,33 @@ std::string addBig(const std::string& a, const std::string& b) {
         carry = sum / 10;
         result += char('0' + sum % 10);
     }
-    if (result.empty()) result = "0";          // FIX edge case 3
+    if (result.empty()) result = "0";          // 修复边界情况 3
     std::reverse(result.begin(), result.end());
-    return stripLeadingZeros(result);           // FIX edge cases 1 & 4
+    return stripLeadingZeros(result);           // 修复边界情况 1 & 4
 }
 
 std::string multiplyBig(const std::string& a, const std::string& b) {
-    if (a == "0" || b == "0") return "0";      // FIX edge case 2
-    // … normal multiplication logic …
+    if (a == "0" || b == "0") return "0";      // 修复边界情况 2
+    // … 正常乘法逻辑 …
     std::string result = "0";
-    // (implementation omitted for brevity)
+    // （具体实现略）
     return stripLeadingZeros(result);
 }
 
 int main() {
-    std::cout << addBig("0", "0")       << "\n"; // "0"   ✓
+    std::cout << addBig("0", "0")       << "\n"; // "0"    ✓
     std::cout << addBig("999", "1")     << "\n"; // "1000" ✓
     std::cout << addBig("123", "456")   << "\n"; // "579"  ✓
     return 0;
 }
 ```
 
-**Lessons Learned**
-- Always handle zero operands as a special case **before** entering the main loop.
-- Call a `stripLeadingZeros` helper unconditionally before returning any big‑number result.
-- Guard against an empty result string by defaulting to `"0"`.
-- Write a dedicated unit‑test suite that covers: `0+0`, `0×n`, `n−n`, single‑digit operands, and numbers with different lengths.
+**经验教训**
+- 在进入主循环**之前**，始终将零操作数作为特殊情况单独处理。
+- 每次返回大数结果前，无条件调用 `stripLeadingZeros` 辅助函数。
+- 对空结果字符串做保护，默认返回 `"0"`。
+- 编写专项单元测试，覆盖：`0+0`、`0×n`、`n−n`、单位数操作数，以及两个长度不同的数相运算等情况。
 
 ---
 
-*Last updated: 2026-03-22*
+*最后更新：2026-03-22*
